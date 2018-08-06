@@ -15,20 +15,21 @@
 # You should have received a copy of the GNU General Public License
 # along with Foobar.    If not, see <http://www.gnu.org/licenses/>.
 
+from future.standard_library import install_aliases
+install_aliases()
+
 from pandocfilters import walk, Str, elt
 import codecs
 import json
 import sys
 import tempfile
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
 
 MetaInlines = elt('MetaInlines', 1)
 
 
 def toJSONFilter(filters=[], metafilters=[]):
-    reader = codecs.getreader('utf8')
-    doc = json.loads(reader(sys.stdin).read())
+    doc = json.load(sys.stdin)
     if len(sys.argv) > 1:
         format = sys.argv[1]
     else:
@@ -57,16 +58,16 @@ def extractCites(key, value, format, meta):
 
 def fetchItem(keytype, key):
     keyenc = key.encode('utf8')
-    url = "http://127.0.0.1:23119/zotxt/items?%s=%s" % (keytype, urllib.quote_plus(keyenc))
+    url = "http://127.0.0.1:23119/zotxt/items?%s=%s" % (keytype, urllib.parse.quote_plus(keyenc))
     try:
-        data = json.load(urllib2.urlopen(url))
+        data = json.load(urllib.request.urlopen(url))
         if len(data) == 0:
             return None
         else:
             cite = data[0]
             cite["id"] = key
             return cite
-    except (urllib2.HTTPError, IndexError), e:
+    except (urllib.error.HTTPError, IndexError) as e:
         return None
 
 def alterMetadata(meta):
@@ -80,7 +81,7 @@ def alterMetadata(meta):
             cite = fetchItem('betterbibtexkey', citekey)
             if cite:
                 cites.append(cite)
-    tmpfile = tempfile.NamedTemporaryFile(suffix='.json', delete=False)
+    tmpfile = tempfile.NamedTemporaryFile(mode='wt', suffix='.json', delete=False)
     json.dump(cites, tmpfile, indent=2)
     tmpfile.close()
     meta['bibliography'] = MetaInlines([Str(tmpfile.name)])
